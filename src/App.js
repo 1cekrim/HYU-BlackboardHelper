@@ -1,23 +1,45 @@
-import React from 'react';
-import logo from './logo.svg';
+/*global chrome*/
+
+import React, { useState, useEffect } from 'react';
+import { Button } from 'react-bootstrap'
 import './App.css';
+
+function simulateNetworkRequest() {
+  return new Promise((resolve) => setTimeout(resolve, 2000));
+}
+
+function LoadingButton() {
+  const [isLoading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isLoading) {
+      simulateNetworkRequest().then(() => {
+        setLoading(false);
+      });
+    }
+  }, [isLoading]);
+
+  const handleClick = () => setLoading(true);
+
+  return (
+    <Button
+      variant="primary"
+      disabled={isLoading}
+      onClick={!isLoading ? handleClick : null}
+    >
+      {isLoading ? '조회중…' : '온라인 출석 조회'}
+    </Button>
+  );
+}
 
 function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
+        <div>
+          한양대학교 블랙보드 도우미
+        </div>
+        <LoadingButton />
       </header>
     </div>
   );
