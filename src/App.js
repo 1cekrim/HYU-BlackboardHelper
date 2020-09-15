@@ -1,5 +1,3 @@
-/*global chrome*/
-
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom'
 import { Button, Table } from 'react-bootstrap'
@@ -20,11 +18,14 @@ function Loading() {
   loadTables();
   const element = (
     <div className="center-main">
-      <div className="spinner-grow text-light width: 3rem; height: 3rem;" role="status" />
-      <p className="text-light">온라인 출석 조회 불러오는 중...</p>
+      <div>
+        <div className="spinner-grow text-light width: 3rem; height: 3rem;" role="status" />
+        <p className="text-light">온라인 출석 조회 불러오는 중...</p>
+      </div>
+      <p className="text-success" id="term">최근 학기 불러오는 중...</p>
     </div>
   )
-  return element;d
+  return element;
 }
 
 async function loadTables() {
@@ -40,48 +41,22 @@ async function loadTables() {
   }
 }
 
-// function LoadingButton() {
-//   const [isLoading, setLoading] = useState(false);
-
-//   useEffect(() => {
-//     (async function () {
-//       if (isLoading) {
-//         try {
-//           setLoading(true);
-//           await UpdateAttendanceTables();
-//         } catch (err) {
-//           console.log(err.message)
-//         } finally {
-//           setLoading(false);
-//         }
-//       }
-//     })();
-//   }, [isLoading]);
-
-//   const handleClick = () => setLoading(true);
-
-//   return (
-//     <Button
-//       variant="primary"
-//       disabled={isLoading}
-//       onClick={!isLoading ? handleClick : null}
-//     >
-//       {isLoading ? '조회중…' : '온라인 출석 조회'}
-//     </Button>
-//   );
-// }
-
 async function UpdateAttendanceTables() {
   const userKey = await GetUserKey();
   const coursesData = await GetCourses(userKey);
   const courses = coursesData['courses'];
   let termList = coursesData['termList'];
-  console.log(termList);
   // 내림차순 정렬
   termList.sort((a, b) => {
     return Number(b.replace(/[^0-9]/g, "")) - Number(a.replace(/[^0-9]/g, ""));
   })
   const targetTerm = termList[0];
+  const targetTermElement = (
+    <div class="target-term">
+      {targetTerm}
+    </div>
+  )
+  ReactDOM.render(targetTermElement, document.querySelector('#term'));
   const targetCourses = courses.filter(course => course.term === targetTerm);
 
   let courseTables = []
@@ -95,6 +70,7 @@ async function UpdateAttendanceTables() {
   const element = (
     <DrawAllTable data={courseTables} />
   );
+  document.querySelector('main').classList.remove('h-100');
   ReactDOM.render(element, document.querySelector('main'));
   return userKey;
 }
@@ -111,7 +87,6 @@ async function GetCourseAttendance(id, name) {
   let formElement = await (async function () {
     const url = `https://learn.hanyang.ac.kr/webapps/blackboard/execute/blti/launchPlacement?blti_placement_id=_17_1&course_id=${id}&from_ultra=true`;
     const rep = await GetResponse(url);
-    console.log(url);
     const html = await rep.text();
     let parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
@@ -123,7 +98,6 @@ async function GetCourseAttendance(id, name) {
   for (const pair of new FormData(formElement)) {
       data.append(pair[0], pair[1]);
   }
-  console.log(url);
   const rep = await fetch(url, {
     credentials: "same-origin",
     mode: "no-cors",
@@ -135,7 +109,6 @@ async function GetCourseAttendance(id, name) {
   let parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
   const ele = doc.getElementById("listContainer_databody");
-  console.log(ele);
   let courseAttendance = {
     "id": id,
     "name": name,
@@ -144,7 +117,6 @@ async function GetCourseAttendance(id, name) {
   if (ele) {
     Array.from(ele.rows).forEach(child => {
       let data = []
-      console.log(child);
       Array.from(child.getElementsByTagName('td')).forEach(td => {
         data.push(td.getElementsByClassName('table-data-cell-value')[0].innerText)
       })
@@ -185,7 +157,8 @@ async function GetUserKey() {
   const html = await rep.text();
   let idx = html.indexOf('"id":');
   if (idx === -1) {
-    throw new Error("can't find id");
+    console.error(html);
+    throw new Error("사용자 ID를 찾을 수 없습니다.");
   }
   idx += 6;
   let key = "";

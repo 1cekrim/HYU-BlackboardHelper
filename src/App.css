@@ -22,7 +22,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: top;
-  font-size: calc(10px + 2vmin);
+  font-size: 2rem;
   color: white;
 }
 
@@ -58,9 +58,14 @@ table {
   margin-top: 0rem;
   margin-bottom: 0rem;
   font-size: 1rem;
+  background-color: #282c34;
 }
 
 .center-main {
   position: fixed;
   text-align: center;
+}
+
+.target-term {
+  font-size: 1rem;
 }
