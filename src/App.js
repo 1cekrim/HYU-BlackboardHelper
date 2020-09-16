@@ -154,21 +154,15 @@ async function GetCourses(userKey) {
 }
 
 async function GetUserKey() {
-  const url = "https://learn.hanyang.ac.kr/ultra/course";
+  const url = "https://learn.hanyang.ac.kr/learn/api/v1/users/me";
   const rep = await GetResponse(url);
-  const html = await rep.text();
-  let idx = html.indexOf('"id":');
-  if (idx === -1) {
-    console.error(html);
-    throw new Error("사용자 ID를 찾을 수 없습니다.");
+  const json = await rep.json();
+  if ('id' in json) {
+    return json['id'];
   }
-  idx += 6;
-  let key = "";
-  while (html[idx] !== '"' && html[idx] !== '?') {
-    key += html[idx]
-    ++idx
-  }
-  return key
+  console.error(json);
+  throw new Error("사용자 ID를 찾을 수 없습니다.");
+  return null;
 }
 
 function DrawAllTable(probs) {
