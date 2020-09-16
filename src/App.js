@@ -98,6 +98,8 @@ async function GetCourseAttendance(id, name) {
   for (const pair of new FormData(formElement)) {
       data.append(pair[0], pair[1]);
   }
+  data.append('showAll', 'true');
+
   const rep = await fetch(url, {
     credentials: "same-origin",
     mode: "no-cors",
