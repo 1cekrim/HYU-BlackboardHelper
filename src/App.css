@@ -69,3 +69,8 @@ table {
 .target-term {
   font-size: 1rem;
 }
+
+.grade-name {
+  cursor: pointer;
+  text-decoration: underline;
+}

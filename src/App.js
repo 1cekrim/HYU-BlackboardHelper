@@ -1,6 +1,8 @@
+/*global chrome*/
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom'
 import { Button, Table } from 'react-bootstrap'
+import Moment from 'react-moment';
 import './App.css';
 
 
@@ -68,14 +70,24 @@ async function UpdateAttendanceTables() {
     const courseGrades = await GetGrades(course['id'], userKey);
     console.log(courseGrades);
     console.log(courseAttendance);
-    courseTables.push(courseAttendance);
+    courseTables.push([courseAttendance, courseGrades]);
   }
   console.log(courseTables);
   const element = (
-    <DrawAllTable data={courseTables} />
+    <DrawAllTable data={courseTables}/>
   );
   document.querySelector('main').classList.remove('h-100');
   ReactDOM.render(element, document.querySelector('main'));
+
+  let names = document.getElementsByClassName("grade-name");
+  for (let tag of names) {
+    tag.addEventListener("click", () => {
+      console.log(tag.getAttribute('link'));
+      const link = tag.getAttribute('link');
+      chrome.windows.create({url: link, type: 'normal'});
+    });
+  }
+
   return userKey;
 }
 
@@ -295,14 +307,55 @@ async function GetGrades(id, userId) {
     // COMPLETED
     // IN_MORE_PROGRESS
     // NEEDS_MORE_GRADING
-    
+    const status = {
+      'NOT_ATTEMPTED': {
+        'name': '시도하지 않음',
+        'grade': false
+      },
+      'ABANDONED': {
+        'name': '포기함',
+        'grade': false
+      },
+      'IN_PROGRESS': {
+        'name': '진행중',
+        'grade': false
+      },
+      'SUSPENDED': {
+        'name': '유보됨',
+        'grade': false
+      },
+      'CANCELLED': {
+        'name': '취소됨',
+        'grade': false
+      },
+      'NEEDS_GRADING': {
+        'name': '채점중',
+        'grade': true
+      },
+      'COMPLETED': {
+        'name': '완료됨',
+        'grade': true
+      },
+      'IN_MORE_PROGRESS': {
+        'name': '추가 진행 필요',
+        'grade': false
+      },
+      'NEEDS_MORE_GRADING': {
+        'name': '추가 채점 필요',
+        'grade': false
+      }
+    }
+
     result.push({
       'name': name,
       'dueDate': dueDate,
       'columnId': columnId,
       'lastAttemptid': lastAttemptId,
       'lastAttemptUrl': '',
-      'attempt': attemptData
+      'attempt': attemptData,
+      'contentId': column['contentId'],
+      'contentUrl': `https://learn.hanyang.ac.kr/ultra/courses/${id}/outline/assessment/${column['contentId']}/overview?courseId=${id}`,
+      'status': status[attemptData['status']]
     })
   }
 
@@ -313,7 +366,7 @@ function DrawAllTable(probs) {
   return (
     <div>
       {probs.data.map((course, _) => (
-        <AttendanceTable title={course.name} data={course.data} key={course.id}/>
+        <AttendanceTable title={course[0].name} data={course[0].data} grade={course[1]} key={course.id}/>
       ))}
     </div>
   );
@@ -323,26 +376,76 @@ function AttendanceTable(probs) {
   return (
     <div>
       <p className="text-white Table-title">{probs.title}</p>
-      <Table responsive="lg" size="sm" variant="dark" bordered>
-        <thead>
-          <tr>
-            <th>위치</th>
-            <th>컨텐츠명</th>
-            <th>P/F</th>
-          </tr>
-        </thead>
-        <tbody>
-          {probs.data.map((row, idx) => (
-            <tr key={idx}>
-              {row.map((ele, idx) => 
-                (<td key={idx} className={row[2]==='F' ? 'text-warning' : 'text-success'}>{ele}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </Table>
+      <AttendanceTableContent data={probs.data}/>
+      <GradeTableContent data={probs.grade}/>
     </div>
   );
+}
+
+function AttendanceTableContent(probs) {
+  if (probs.data.length == 0) {
+    return (
+      <div className="text-white">
+        강의 영상이 없습니다
+      </div>
+    );
+  }
+  return (
+    <Table responsive="lg" size="sm" variant="dark" bordered>
+      <thead>
+        <tr>
+          <th>위치</th>
+          <th>컨텐츠명</th>
+          <th>P/F</th>
+        </tr>
+      </thead>
+      <tbody>
+        {probs.data.map((row, idx) => (
+          <tr key={idx}>
+            {row.map((ele, idx) => 
+              (<td key={idx} className={row[2]==='F' ? 'text-warning' : 'text-success'}>{ele}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  );
+}
+
+function GradeTableContent(probs) {
+  if (probs.data.length == 0) {
+    return (
+      <div></div>
+    );
+  }
+  return (
+    <Table responsive="lg" size="sm" variant="dark" bordered>
+      <thead>
+        <tr>
+          <th>과제명</th>
+          <th>기한</th>
+          <th>상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        {probs.data.map((row, idx) => (
+          <tr key={idx} className={row['status']['grade'] ? 'text-success' : 'text-warning'}>
+            <td className='grade-name' link={row['contentUrl']}>
+              {row['name']}
+            </td>
+            <td>
+              <Moment local format='yyyy-MM-DD HH:mm'>
+                {row['dueDate']}
+              </Moment>
+            </td>
+            <td>
+              {row['status']['name']}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  )
 }
 
 export default App;
