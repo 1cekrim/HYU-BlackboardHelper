@@ -414,7 +414,7 @@ function GradeTableContent(probs) {
       <thead>
         <tr>
           <th>과제명</th>
-          <th>기한</th>
+          <th>마감</th>
           <th>상태</th>
         </tr>
       </thead>
