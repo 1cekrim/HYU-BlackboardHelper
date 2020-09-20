@@ -69,7 +69,6 @@ async function UpdateAttendanceTables() {
       course["id"],
       course["name"]
     );
-    // const courseStructure = await GetCourseStructure(course['id'], course['name']);
     const courseGrades = await GetGrades(course["id"], userKey);
     console.log(courseGrades);
     console.log(courseAttendance);
@@ -83,8 +82,22 @@ async function UpdateAttendanceTables() {
   let names = document.getElementsByClassName("grade-name");
   for (let tag of names) {
     tag.addEventListener("click", () => {
-      console.log(tag.getAttribute("link"));
       const link = tag.getAttribute("link");
+      chrome.windows.create({ url: link, type: "normal" });
+    });
+  }
+
+  names = document.getElementsByClassName("video-name");
+  for (let tag of names) {
+    tag.addEventListener("click", async () => {
+      const courseId = tag.getAttribute("courseid");
+      const pos = tag.getAttribute("pos");
+      const videoName = tag.getAttribute("videoname");
+      const link = await GetCourseVideoUrl(courseId, pos, videoName);
+      if (link == "") {
+        alert("강의 영상을 찾을 수 없습니다");
+        return;
+      }
       chrome.windows.create({ url: link, type: "normal" });
     });
   }
@@ -93,10 +106,14 @@ async function UpdateAttendanceTables() {
 }
 
 async function GetResponse(url) {
-  return await fetch(url, {
-    credentials: "same-origin",
-    mode: "no-cors",
-  });
+  try {
+    return await fetch(url, {
+      credentials: "same-origin",
+      mode: "no-cors",
+    });
+  } catch (err) {
+    throw new Error(`fetch 실패. url:${url}`);
+  }
 }
 
 async function GetCourseAttendance(id, name) {
@@ -183,7 +200,40 @@ async function GetUserKey() {
   throw new Error("사용자 ID를 찾을 수 없습니다.");
 }
 
-async function GetCourseStructure(id, name) {
+async function GetCourseVideoUrl(id, folderTitle, videoTitle) {
+  async function GetChildren(rootId) {
+    const url = `https://learn.hanyang.ac.kr/learn/api/v1/courses/${id}/contents/${rootId}/children?@view=Summary&expand=assignedGroups,selfEnrollmentGroups.group,gradebookCategory&limit=10000`;
+    const rep = await GetResponse(url);
+    const contents = (await rep.json())["results"];
+    return contents;
+  }
+
+  const children = await GetChildren("ROOT");
+  let result = "";
+  for (const now of children) {
+    if (
+      now["title"] === folderTitle &&
+      "resource/x-bb-folder" === now["contentHandler"] &&
+      !now["contentDetail"]["resource/x-bb-folder"]["isBbPage"] &&
+      now["contentDetail"]["resource/x-bb-folder"]["isFolder"]
+    ) {
+      const contents = await GetChildren(now["id"]);
+      for (const content of contents) {
+        if (
+          content["title"] === videoTitle &&
+          "resource/x-bb-externallink" === content["contentHandler"]
+        ) {
+          result =
+            content["contentDetail"]["resource/x-bb-externallink"]["url"];
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+async function GetCourseStructure(id) {
   async function GetChildren(rootId) {
     const url = `https://learn.hanyang.ac.kr/learn/api/v1/courses/${id}/contents/${rootId}/children?@view=Summary&expand=assignedGroups,selfEnrollmentGroups.group,gradebookCategory&limit=10000`;
     const rep = await GetResponse(url);
@@ -198,6 +248,7 @@ async function GetCourseStructure(id, name) {
       children: [],
       contents: [],
       contentDetail: "",
+      courseVideos: [],
     },
   ];
   st.push(root);
@@ -205,7 +256,7 @@ async function GetCourseStructure(id, name) {
   while (st.length > 0) {
     let [id, parent] = st.pop();
     const children = await GetChildren(id);
-    children.forEach((now) => {
+    for (const now of children) {
       if (!("contentDetail" in now)) {
         console.error(`contentDetail does not exist\n${now}`);
         return;
@@ -235,8 +286,19 @@ async function GetCourseStructure(id, name) {
         // TODO: 다운로드 기능 필요해지면 그때 구현할 것
         // 일단 다 넣음
         parent["contents"].push(now);
+        if ("resource/x-bb-externallink" === now["contentHandler"]) {
+          const url = now["contentDetail"]["resource/x-bb-externallink"]["url"];
+          if (url) {
+            root[1]["courseVideos"].push({
+              name: content["name"],
+              url: url,
+            });
+          } else {
+            console.error(`Invalid externallink\n${now}`);
+          }
+        }
       }
-    });
+    }
   }
 
   return root;
@@ -357,6 +419,7 @@ function DrawAllTable(probs) {
           title={course[0].name}
           data={course[0].data}
           grade={course[1]}
+          courseId={course[0].id}
           key={course.id}
         />
       ))}
@@ -368,7 +431,7 @@ function AttendanceTable(probs) {
   return (
     <div>
       <p className="text-white Table-title">{probs.title}</p>
-      <AttendanceTableContent data={probs.data} />
+      <AttendanceTableContent data={probs.data} courseId={probs.courseId} />
       <GradeTableContent data={probs.grade} />
     </div>
   );
@@ -393,7 +456,13 @@ function AttendanceTableContent(probs) {
             {row.map((ele, idx) => (
               <td
                 key={idx}
-                className={row[2] === "F" ? "text-warning" : "text-success"}
+                className={
+                  (row[2] === "F" ? "text-warning" : "text-success") +
+                  (idx === 1 ? " video-name" : "")
+                }
+                pos={row[0]}
+                videoname={row[1]}
+                courseid={probs.courseId}
               >
                 {ele}
               </td>
