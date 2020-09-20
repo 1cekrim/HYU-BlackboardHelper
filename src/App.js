@@ -47,6 +47,7 @@ async function UpdateAttendanceTables() {
   const courses = coursesData['courses'];
   let termList = coursesData['termList'];
   // 내림차순 정렬
+  // TODO:  /learn/api/v1/terms API 사용
   termList.sort((a, b) => {
     return Number(b.replace(/[^0-9]/g, "")) - Number(a.replace(/[^0-9]/g, ""));
   })
@@ -63,8 +64,9 @@ async function UpdateAttendanceTables() {
   for (const course of targetCourses) {
     console.log(`${course['name']} 온라인 출석 조회...`);
     const courseAttendance = await GetCourseAttendance(course['id'], course['name']);
-    const courseStructure = await GetCourseStructure(course['id'], course['name']);
-    console.log(courseStructure);
+    // const courseStructure = await GetCourseStructure(course['id'], course['name']);
+    const courseGrades = await GetGrades(course['id'], userKey);
+    console.log(courseGrades);
     console.log(courseAttendance);
     courseTables.push(courseAttendance);
   }
@@ -169,7 +171,7 @@ async function GetUserKey() {
 
 async function GetCourseStructure(id, name) {
   async function GetChildren(rootId) {
-    let url = `https://learn.hanyang.ac.kr/learn/api/v1/courses/${id}/contents/${rootId}/children?@view=Summary&expand=assignedGroups,selfEnrollmentGroups.group,gradebookCategory&limit=10000`
+    const url = `https://learn.hanyang.ac.kr/learn/api/v1/courses/${id}/contents/${rootId}/children?@view=Summary&expand=assignedGroups,selfEnrollmentGroups.group,gradebookCategory&limit=10000`
     const rep = await GetResponse(url);
     const contents = (await rep.json())['results']
     return contents;
@@ -233,9 +235,78 @@ async function GetCourseStructure(id, name) {
   return root;
 }
 
-function GetGrades(id) {
-  // https://learn.hanyang.ac.kr/ultra/courses/_38929_1/grades
+async function GetGrades(id, userId) {
+  async function GetGradeBookGrades() {
+    const url = `https://learn.hanyang.ac.kr/learn/api/v1/courses/${id}/gradebook/grades?limit=100&userId=${userId}`;
+    // expand=attemptsLeft
+    const rep = await GetResponse(url);
+    const json = await rep.json();
+    const results = json['results'];
+    return results;
+  }
+
+  async function GetGradeBookColumns() {
+    const url = `https://learn.hanyang.ac.kr/learn/api/v1/courses/${id}/gradebook/columns?expand=associatedRubrics,collectExternalSubmissions,gradebookCategory&includeInvisible=false`;
+    // expand=attemptsLeft
+    const rep = await GetResponse(url);
+    const json = await rep.json();
+    const results = json['results'];
+    return results;
+  }
+
+  async function GetAttemptData(attemptUrl) {
+    const rep = await GetResponse(attemptUrl);
+    const json = await rep.json();
+    return json;
+  }
   
+  const grades = await GetGradeBookGrades();
+  const columns = await GetGradeBookColumns();
+
+  let result = [];
+
+  for (let column of columns) {
+    const name = column['columnName'];
+    if (name == '출석') {
+      continue;
+    }
+    const dueDate = column['dueDate']; // 9시간 추가
+    const columnId = column['id'];
+    let lastAttemptId = ''
+    let lastAttemptUrl = ''
+    for (const grade of grades) {
+      if (grade['columnId'] == columnId) {
+        lastAttemptId = grade['lastAttemptId'];
+        lastAttemptUrl = grade['lastAttemptUrl'];
+      }
+    }
+    if (lastAttemptId == '') {
+      // TODO: 예외 처리
+      console.error(column);
+    }
+
+    const attemptData = await GetAttemptData(lastAttemptUrl);
+    // NOT_ATTEMPTED (deprecated)
+    // ABANDONED (deprecated)
+    // IN_PROGRESS
+    // SUSPENDED
+    // CANCELLED (deprecated)
+    // NEEDS_GRADING
+    // COMPLETED
+    // IN_MORE_PROGRESS
+    // NEEDS_MORE_GRADING
+    
+    result.push({
+      'name': name,
+      'dueDate': dueDate,
+      'columnId': columnId,
+      'lastAttemptid': lastAttemptId,
+      'lastAttemptUrl': '',
+      'attempt': attemptData
+    })
+  }
+
+  return result;
 }
 
 function DrawAllTable(probs) {
