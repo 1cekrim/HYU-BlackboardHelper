@@ -63,6 +63,8 @@ async function UpdateAttendanceTables() {
   for (const course of targetCourses) {
     console.log(`${course['name']} 온라인 출석 조회...`);
     const courseAttendance = await GetCourseAttendance(course['id'], course['name']);
+    const courseStructure = await GetCourseStructure(course['id'], course['name']);
+    console.log(courseStructure);
     console.log(courseAttendance);
     courseTables.push(courseAttendance);
   }
@@ -163,6 +165,77 @@ async function GetUserKey() {
   console.error(json);
   throw new Error("사용자 ID를 찾을 수 없습니다.");
   return null;
+}
+
+async function GetCourseStructure(id, name) {
+  async function GetChildren(rootId) {
+    let url = `https://learn.hanyang.ac.kr/learn/api/v1/courses/${id}/contents/${rootId}/children?@view=Summary&expand=assignedGroups,selfEnrollmentGroups.group,gradebookCategory&limit=10000`
+    const rep = await GetResponse(url);
+    const contents = (await rep.json())['results']
+    return contents;
+  }
+  let st = []
+  let root = ['ROOT', {
+    'name': 'ROOT',
+    'children': [],
+    'contents': [],
+    'contentDetail': ''
+  }]
+  st.push(root);
+
+  while (st.length > 0) {
+    let [id, parent] = st.pop();
+    const children = await GetChildren(id);
+    children.forEach(now => {
+      if (!('contentDetail' in now)) {
+        console.error(`contentDetail does not exist\n${now}`);
+        return;
+      }
+
+      let content = {
+        'name': now['title'],
+        'children': [],
+        'contents': [],
+        'contentDetail': now['contentDetail']
+      };
+
+      //"resource/x-bb-lesson" 학생용 가이드
+      //"resource/x-bb-file" 다운로드 가능한 파일
+      //"resource/x-bb-asmt-test-link" 과제
+      // genericReadOnlyData->dueDate: 과제 마감 기한
+      // 9시간 더해야 함!!!!
+      //  '' ->hasGradeColumn: gradingColumn유무?
+      // 과제->test->assessment->gradingColumn
+        // columnName: 과제명
+        // dueDate: 과제 마감 기한
+      //  /learn/api/v1/courses/_38929_1/gradebook/columns/_332121_1/grades/_2868288_1/attempts?fields=id,status,attemptDate 
+      // _332121_1: gradingColumn.gradebookCategory.id
+      // {"results":[{"attemptDate":"2020-09-19T05:09:06.856Z","id":"_2289349_1","status":"IN_PROGRESS"}],"paging":{"previousPage":"","nextPage":"","count":1,"limit":1000,"offset":0},"permissions":{"createAttempt":false,"deleteAttempt":false,"viewAttempt":true,"editAttempt":false}}
+
+      // 폴더
+      if ('resource/x-bb-folder' == now['contentHandler'] && !now['contentDetail']['resource/x-bb-folder']['isBbPage'] && now['contentDetail']['resource/x-bb-folder']['isFolder']) {
+        st.push([now['id'], content]);
+        console.log(st);
+        parent['children'].push(content);
+      }
+      // else if ('resource/x-bb-file' in now['contentDetail']) {
+
+      // }
+      else {
+        // 파일, 영상, 비디오는 따로 구현하지 않음
+        // TODO: 다운로드 기능 필요해지면 그때 구현할 것
+        // 일단 다 넣음
+        parent['contents'].push(now);
+      }
+    });
+  }
+
+  return root;
+}
+
+function GetGrades(id) {
+  // https://learn.hanyang.ac.kr/ultra/courses/_38929_1/grades
+  
 }
 
 function DrawAllTable(probs) {
