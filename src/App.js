@@ -83,7 +83,7 @@ async function UpdateAttendanceTables() {
   for (let tag of names) {
     tag.addEventListener("click", () => {
       const link = tag.getAttribute("link");
-      chrome.windows.create({ url: link, type: "normal" });
+      chrome.tabs.create({ url: link, active: false });
     });
   }
 
@@ -98,7 +98,7 @@ async function UpdateAttendanceTables() {
         alert("강의 영상을 찾을 수 없습니다");
         return;
       }
-      chrome.windows.create({ url: link, type: "normal" });
+      chrome.tabs.create({ url: link, active: false });
     });
   }
 
