@@ -1,22 +1,33 @@
 /* global chrome */
 import React from "react";
 import ReactDOM from "react-dom";
-import { Table } from "react-bootstrap";
+import { Table, Button } from "react-bootstrap";
 import Moment from "react-moment";
 import "./App.css";
+
+// import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+// import { faSyncAlt } from "@fortawesome/free-solid-svg-icons";
 
 function App() {
   return (
     <div className="App">
       <main className="h-100 w-100">
-        <Loading />
+        <Loading refreshFlag={false} />
       </main>
     </div>
   );
 }
 
-function Loading() {
-  loadTables();
+function Refresh() {
+  document.querySelector("main").classList.add("h-100");
+  ReactDOM.render(
+    <Loading refreshFlag={true} />,
+    document.querySelector("main")
+  );
+}
+
+function Loading(probs) {
+  loadTables(probs.refreshFlag);
   const element = (
     <div className="center-main">
       <div>
@@ -34,9 +45,18 @@ function Loading() {
   return element;
 }
 
-async function loadTables() {
+async function loadTables(refreshFlag) {
   try {
-    await UpdateAttendanceTables();
+    // let courseTables;
+    // console.log(loadData);
+    // if (refreshFlag || !("courseTables" in loadData)) {
+    //   courseTables = await GetCourseTables();
+    //   await SaveCourseTables(courseTables);
+    // } else {
+    //   courseTables = loadData["courseTables"];
+    // }
+    const courseTables = await GetCourseTables();
+    RenderMainTables(courseTables);
   } catch (err) {
     const errorElement = (
       <div class="alert alert-warning" role="alert">
@@ -48,7 +68,19 @@ async function loadTables() {
 }
 
 function RenderMainTables(courseTables) {
-  const element = <DrawAllTable data={courseTables} />;
+  const element = (
+    <div>
+      {/* <div>
+        <FontAwesomeIcon
+          icon={faSyncAlt}
+          onClick={Refresh}
+          className="refreshIcon"
+          size="3x"
+        />
+      </div> */}
+      <DrawAllTable data={courseTables} />
+    </div>
+  );
   document.querySelector("main").classList.remove("h-100");
   ReactDOM.render(element, document.querySelector("main"));
 
@@ -76,7 +108,27 @@ function RenderMainTables(courseTables) {
   }
 }
 
-async function UpdateAttendanceTables() {
+// function SaveCourseTables(courseTables) {
+//   return new Promise(function (resolve, reject) {
+//     chrome.storage.local.set({ courseTables: courseTables }, function () {
+//       console.log("saved");
+//       console.log(courseTables);
+//       resolve();
+//     });
+//   });
+// }
+
+// function LoadCourseTables() {
+//   return new Promise(function (resolve, reject) {
+//     chrome.storage.local.get("courseTables", function (courseTables) {
+//       console.log("loaded");
+//       console.log(courseTables);
+//       resolve(courseTables);
+//     });
+//   });
+// }
+
+async function GetCourseTables() {
   const userKey = await GetUserKey();
   const coursesData = await GetCourses(userKey);
   const courses = coursesData["courses"];
@@ -103,9 +155,8 @@ async function UpdateAttendanceTables() {
     console.log(courseAttendance);
     courseTables.push([courseAttendance, courseGrades]);
   }
-  RenderMainTables(courseTables);
 
-  return userKey;
+  return courseTables;
 }
 
 async function GetResponse(url) {
@@ -310,7 +361,6 @@ async function GetCourseStructure(id) {
 async function GetGrades(id, userId) {
   async function GetGradeBookGrades() {
     const url = `https://learn.hanyang.ac.kr/learn/api/v1/courses/${id}/gradebook/grades?limit=100&userId=${userId}`;
-    // expand=attemptsLeft
     const rep = await GetResponse(url);
     const json = await rep.json();
     const results = json["results"];
@@ -319,7 +369,6 @@ async function GetGrades(id, userId) {
 
   async function GetGradeBookColumns() {
     const url = `https://learn.hanyang.ac.kr/learn/api/v1/courses/${id}/gradebook/columns?expand=associatedRubrics,collectExternalSubmissions,gradebookCategory&includeInvisible=false`;
-    // expand=attemptsLeft
     const rep = await GetResponse(url);
     const json = await rep.json();
     const results = json["results"];
@@ -352,16 +401,10 @@ async function GetGrades(id, userId) {
         lastAttemptUrl = grade["lastAttemptUrl"];
       }
     }
-    if (lastAttemptId === "") {
-      // TODO: 예외 처리
-      console.error(column);
-    }
-
-    const attemptData = await GetAttemptData(lastAttemptUrl);
 
     const status = {
       NOT_ATTEMPTED: {
-        name: "시도하지 않음",
+        name: "확인안함",
         grade: false,
       },
       ABANDONED: {
@@ -398,16 +441,25 @@ async function GetGrades(id, userId) {
       },
     };
 
+    let statusData;
+
+    if (lastAttemptId === "") {
+      console.error("제출이 존재하지 않음.");
+      statusData = status["NOT_ATTEMPTED"];
+    } else {
+      const attemptData = await GetAttemptData(lastAttemptUrl);
+      statusData = status[attemptData["status"]];
+    }
+
     result.push({
       name: name,
       dueDate: dueDate,
       columnId: columnId,
       lastAttemptid: lastAttemptId,
       lastAttemptUrl: "",
-      attempt: attemptData,
       contentId: column["contentId"],
       contentUrl: `https://learn.hanyang.ac.kr/ultra/courses/${id}/outline/assessment/${column["contentId"]}/overview?courseId=${id}`,
-      status: status[attemptData["status"]],
+      status: statusData,
     });
   }
 
