@@ -47,6 +47,35 @@ async function loadTables() {
   }
 }
 
+function RenderMainTables(courseTables) {
+  const element = <DrawAllTable data={courseTables} />;
+  document.querySelector("main").classList.remove("h-100");
+  ReactDOM.render(element, document.querySelector("main"));
+
+  let names = document.getElementsByClassName("grade-name");
+  for (let tag of names) {
+    tag.addEventListener("click", () => {
+      const link = tag.getAttribute("link");
+      chrome.tabs.create({ url: link, active: false });
+    });
+  }
+
+  names = document.getElementsByClassName("video-name");
+  for (let tag of names) {
+    tag.addEventListener("click", async () => {
+      const courseId = tag.getAttribute("courseid");
+      const pos = tag.getAttribute("pos");
+      const videoName = tag.getAttribute("videoname");
+      const link = await GetCourseVideoUrl(courseId, pos, videoName);
+      if (link == "") {
+        alert("강의 영상을 찾을 수 없습니다");
+        return;
+      }
+      chrome.tabs.create({ url: link, active: false });
+    });
+  }
+}
+
 async function UpdateAttendanceTables() {
   const userKey = await GetUserKey();
   const coursesData = await GetCourses(userKey);
@@ -74,33 +103,7 @@ async function UpdateAttendanceTables() {
     console.log(courseAttendance);
     courseTables.push([courseAttendance, courseGrades]);
   }
-  console.log(courseTables);
-  const element = <DrawAllTable data={courseTables} />;
-  document.querySelector("main").classList.remove("h-100");
-  ReactDOM.render(element, document.querySelector("main"));
-
-  let names = document.getElementsByClassName("grade-name");
-  for (let tag of names) {
-    tag.addEventListener("click", () => {
-      const link = tag.getAttribute("link");
-      chrome.tabs.create({ url: link, active: false });
-    });
-  }
-
-  names = document.getElementsByClassName("video-name");
-  for (let tag of names) {
-    tag.addEventListener("click", async () => {
-      const courseId = tag.getAttribute("courseid");
-      const pos = tag.getAttribute("pos");
-      const videoName = tag.getAttribute("videoname");
-      const link = await GetCourseVideoUrl(courseId, pos, videoName);
-      if (link == "") {
-        alert("강의 영상을 찾을 수 없습니다");
-        return;
-      }
-      chrome.tabs.create({ url: link, active: false });
-    });
-  }
+  RenderMainTables(courseTables);
 
   return userKey;
 }
