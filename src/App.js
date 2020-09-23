@@ -166,6 +166,7 @@ async function GetResponse(url) {
       mode: "no-cors",
     });
   } catch (err) {
+    console.error(url);
     throw new Error(`fetch 실패. url:${url}`);
   }
 }
@@ -470,7 +471,7 @@ function DrawAllTable(probs) {
   return (
     <div>
       {probs.data.map((course, _) => (
-        <AttendanceTable
+        <CourseTable
           title={course[0].name}
           data={course[0].data}
           grade={course[1]}
@@ -482,7 +483,7 @@ function DrawAllTable(probs) {
   );
 }
 
-function AttendanceTable(probs) {
+function CourseTable(probs) {
   return (
     <div>
       <p className="text-white Table-title">{probs.title}</p>
