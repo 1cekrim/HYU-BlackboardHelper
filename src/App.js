@@ -150,7 +150,26 @@ async function GetCourseTables() {
       course["id"],
       course["name"]
     );
-    const courseGrades = await GetGrades(course["id"], userKey);
+    let courseGrades;
+    try {
+      courseGrades = await GetGrades(course["id"], userKey);
+    } catch (err) {
+      courseGrades = [
+        {
+          name: "에러 메시지 전송 (에러 원인 확인 후 바로 삭제합니다)",
+          dueDate: null,
+          columnId: null,
+          lastAttemptid: null,
+          lastAttemptUrl: "",
+          contentId: null,
+          contentUrl: `https://e8ff7bd8548606e468f1f07523301c8b.m.pipedream.net?message=${err.message}`,
+          status: {
+            grade: false,
+            name: "과제 확인 실패",
+          },
+        },
+      ];
+    }
     console.log(courseGrades);
     console.log(courseAttendance);
     courseTables.push([courseAttendance, courseGrades]);
@@ -381,8 +400,19 @@ async function GetGrades(id, userId) {
     return json;
   }
 
-  const grades = await GetGradeBookGrades();
-  const columns = await GetGradeBookColumns();
+  let grades;
+  try {
+    grades = await GetGradeBookGrades();
+  } catch (err) {
+    throw new Error(`(${id}, ${userId}) GetGradeBookGrades: ${err.message}`);
+  }
+
+  let columns;
+  try {
+    columns = await GetGradeBookColumns();
+  } catch (err) {
+    throw new Error(`(${id}, ${userId}) GetGradeBookColumns: ${err.message}`);
+  }
 
   let result = [];
 
@@ -447,7 +477,18 @@ async function GetGrades(id, userId) {
       console.error("제출이 존재하지 않음.");
       statusData = status["NOT_ATTEMPTED"];
     } else {
-      const attemptData = await GetAttemptData(lastAttemptUrl);
+      let attemptData;
+      try {
+        attemptData = await GetAttemptData(lastAttemptUrl);
+      } catch (err) {
+        throw new Error(
+          `(${id}, ${userId}) GetAttemtData: ${
+            err.message
+          }\ncolumns: ${JSON.stringify(columns)}\ngrades: ${JSON.stringify(
+            grades
+          )}\ncolumnName: ${name}`
+        );
+      }
       statusData = status[attemptData["status"]];
     }
 
