@@ -394,11 +394,11 @@ async function GetGrades(id, userId) {
     return results;
   }
 
-  async function GetAttemptData(attemptUrl) {
-    const rep = await GetResponse(attemptUrl);
-    const json = await rep.json();
-    return json;
-  }
+  // async function GetAttemptData(attemptUrl) {
+  //   const rep = await GetResponse(attemptUrl);
+  //   const json = await rep.json();
+  //   return json;
+  // }
 
   let grades;
   try {
@@ -423,14 +423,9 @@ async function GetGrades(id, userId) {
     }
     const dueDate = column["dueDate"]; // 9시간 추가
     const columnId = column["id"];
-    let lastAttemptId = "";
-    let lastAttemptUrl = "";
-    for (const grade of grades) {
-      if (grade["columnId"] === columnId) {
-        lastAttemptId = grade["lastAttemptId"];
-        lastAttemptUrl = grade["lastAttemptUrl"];
-      }
-    }
+    // let lastAttemptId = "";
+    // let lastAttemptUrl = "";
+    let statusData;
 
     const status = {
       NOT_ATTEMPTED: {
@@ -454,7 +449,7 @@ async function GetGrades(id, userId) {
         grade: false,
       },
       NEEDS_GRADING: {
-        name: "채점중",
+        name: "채점되지 않음",
         grade: true,
       },
       COMPLETED: {
@@ -469,35 +464,47 @@ async function GetGrades(id, userId) {
         name: "추가 채점 필요",
         grade: false,
       },
+      GRADED: {
+        name: "채점됨",
+        grade: true,
+      },
     };
 
-    let statusData;
-
-    if (lastAttemptId === "") {
-      console.error("제출이 존재하지 않음.");
-      statusData = status["NOT_ATTEMPTED"];
-    } else {
-      let attemptData;
-      try {
-        attemptData = await GetAttemptData(lastAttemptUrl);
-      } catch (err) {
-        throw new Error(
-          `(${id}, ${userId}) GetAttemtData: ${
-            err.message
-          }\ncolumns: ${JSON.stringify(columns)}\ngrades: ${JSON.stringify(
-            grades
-          )}\ncolumnName: ${name}`
-        );
+    for (const grade of grades) {
+      if (grade["columnId"] === columnId) {
+        statusData = status[grade["status"]] || {
+          name: `오류 발생. status가 '${grade["status"]}' 였습니다.`,
+          grade: false,
+        };
       }
-      statusData = status[attemptData["status"]];
     }
 
-    result.push({
+    // if (attemptData["status"] === "GRADED") {
+    //   statusData = status["GRADED"];
+    // } else if (lastAttemptId === "") {
+    //   console.error("제출이 존재하지 않음.");
+    //   statusData = status["NOT_ATTEMPTED"];
+    // } else {
+    //   let attemptData;
+    //   try {
+    //     attemptData = await GetAttemptData(lastAttemptUrl);
+    //   } catch (err) {
+    //     throw new Error(
+    //       `(${id}, ${userId}) GetAttemtData: ${
+    //         err.message
+    //       }\ncolumns: ${JSON.stringify(columns)}\ngrades: ${JSON.stringify(
+    //         grades
+    //       )}\ncolumnName: ${name}`
+    //     );
+    //   }
+    //   statusData = status[attemptData["status"]];
+    // }
+    statusData = result.push({
       name: name,
       dueDate: dueDate,
       columnId: columnId,
-      lastAttemptid: lastAttemptId,
-      lastAttemptUrl: "",
+      // lastAttemptid: lastAttemptId,
+      // lastAttemptUrl: "",
       contentId: column["contentId"],
       contentUrl: `https://learn.hanyang.ac.kr/ultra/courses/${id}/outline/assessment/${column["contentId"]}/overview?courseId=${id}`,
       status: statusData,
