@@ -394,11 +394,11 @@ async function GetGrades(id, userId) {
     return results;
   }
 
-  // async function GetAttemptData(attemptUrl) {
-  //   const rep = await GetResponse(attemptUrl);
-  //   const json = await rep.json();
-  //   return json;
-  // }
+  async function GetAttemptData(attemptUrl) {
+    const rep = await GetResponse(attemptUrl);
+    const json = await rep.json();
+    return json;
+  }
 
   let grades;
   try {
@@ -423,9 +423,8 @@ async function GetGrades(id, userId) {
     }
     const dueDate = column["dueDate"]; // 9시간 추가
     const columnId = column["id"];
-    // let lastAttemptId = "";
-    // let lastAttemptUrl = "";
-    let statusData;
+    let lastAttemptId = "";
+    let lastAttemptUrl = "";
 
     const status = {
       NOT_ATTEMPTED: {
@@ -470,35 +469,38 @@ async function GetGrades(id, userId) {
       },
     };
 
+    let statusData = status["NOT_ATTEMPTED"];
+
     for (const grade of grades) {
       if (grade["columnId"] === columnId) {
-        statusData = status[grade["status"]] || {
-          name: `오류 발생. status가 '${grade["status"]}' 였습니다.`,
-          grade: false,
-        };
+        // statusData = status[grade["status"]] || {
+        //   name: `오류 발생. status가 '${grade["status"]}' 였습니다.`,
+        //   grade: false,
+        // };
+        lastAttemptId = grade["lastAttemptId"] || "";
+        lastAttemptUrl = grade["lastAttemptUrl"] || "";
       }
     }
 
-    // if (attemptData["status"] === "GRADED") {
-    //   statusData = status["GRADED"];
-    // } else if (lastAttemptId === "") {
-    //   console.error("제출이 존재하지 않음.");
-    //   statusData = status["NOT_ATTEMPTED"];
-    // } else {
-    //   let attemptData;
-    //   try {
-    //     attemptData = await GetAttemptData(lastAttemptUrl);
-    //   } catch (err) {
-    //     throw new Error(
-    //       `(${id}, ${userId}) GetAttemtData: ${
-    //         err.message
-    //       }\ncolumns: ${JSON.stringify(columns)}\ngrades: ${JSON.stringify(
-    //         grades
-    //       )}\ncolumnName: ${name}`
-    //     );
-    //   }
-    //   statusData = status[attemptData["status"]];
-    // }
+    if (lastAttemptId === "" || lastAttemptUrl == "") {
+      console.error("제출이 존재하지 않음.");
+      statusData = status["NOT_ATTEMPTED"];
+    } else {
+      let attemptData;
+      try {
+        attemptData = await GetAttemptData(lastAttemptUrl);
+      } catch (err) {
+        throw new Error(
+          `(${id}, ${userId}) GetAttemtData: ${
+            err.message
+          }\ncolumns: ${JSON.stringify(columns)}\ngrades: ${JSON.stringify(
+            grades
+          )}\ncolumnName: ${name}`
+        );
+      }
+      statusData = status[attemptData["status"]];
+    }
+
     statusData = result.push({
       name: name,
       dueDate: dueDate,
